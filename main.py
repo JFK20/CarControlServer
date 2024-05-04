@@ -53,7 +53,7 @@ async def root():
     return {"message": "Hello World"}
 
 
-#region Motor
+# region Motor
 
 @app.post("/drive/motor/{speed}", status_code=200)
 async def set_motor_speed(speed: int):
@@ -74,9 +74,9 @@ async def get_motor_speed():
     return {"speed": app.motor_speed}
 
 
-#endregion
+# endregion
 
-#region Servo
+# region Servo
 
 @app.post("/drive/servo/{angle}", status_code=200)
 async def set_servo_angle(angle: int):
@@ -97,9 +97,9 @@ async def get_servo_angle():
     return {"angle": app.servo_angle}
 
 
-#endregion
+# endregion
 
-#region Constants
+# region Constants
 
 @app.post("/drive/constants", status_code=200)
 async def post_constants():
@@ -112,9 +112,9 @@ async def post_constants():
     return data
 
 
-#endregion
+# endregion
 
-#region LKAS
+# region LKAS
 
 @app.post("/drive/lkas/activate", status_code=200)
 async def activate_lkas():
@@ -127,7 +127,8 @@ async def deactivate_lkas():
     app.LKAS = False
     return {"message": f"LKAS deactivated"}
 
-#endregion
+
+# endregion
 
 if __name__ == '__main__':
     uvicorn.run(app, host='0.0.0.0', port=8000)
