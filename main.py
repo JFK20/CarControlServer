@@ -2,11 +2,23 @@ import uvicorn
 from fastapi import FastAPI, HTTPException
 from contextlib import asynccontextmanager
 import json
+import os
+import time
+import pigpio
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print("Starting up")
+
+    # setup pigpio
+    os.system("sudo pigpiod")
+    time.sleep(3)
+    app.pi = pigpio.pi()
+    time.sleep(3)
+
+    print("Pigpio started")
+
     with open('constants.json') as json_data:
         constants = json.load(json_data)
         app.MOTOR_PIN = constants["MOTOR_PIN"]
@@ -31,6 +43,7 @@ app.SERVO_PIN = -1
 app.SERVO_CENTER = -1
 app.SERVO_OFFSET = -1
 app.servo_angle = -1
+app.pi = None
 
 app.LKAS = False
 
@@ -52,6 +65,7 @@ async def set_motor_speed(speed: int):
         raise HTTPException(status_code=400, detail=f"Speed {speed} is out of range set to maximum")
 
     app.motor_speed = speed
+    app.pi.set_servo_pulsewidth(app.SERVO_PIN, speed)
     return {"message": f"Setting motor speed to {speed}"}
 
 
@@ -73,6 +87,7 @@ async def set_servo_angle(angle: int):
         app.servo_angle = app.SERVO_CENTER + app.SERVO_OFFSET
         raise HTTPException(status_code=400, detail=f"Angle {angle} is out of range set to maximum")
 
+    app.pi.set_servo_pulsewidth(app.SERVO_PIN, angle)
     app.servo_angle = angle
     return {"message": f"Setting servo angle to {angle}"}
 
@@ -116,10 +131,3 @@ async def deactivate_lkas():
 
 if __name__ == '__main__':
     uvicorn.run(app, host='0.0.0.0', port=8000)
-
-
-
-
-
-
-
