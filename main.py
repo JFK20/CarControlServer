@@ -1,3 +1,4 @@
+import uvicorn
 from fastapi import FastAPI, HTTPException
 from contextlib import asynccontextmanager
 import json
@@ -88,8 +89,8 @@ async def get_servo_angle():
 @app.post("/drive/constants", status_code=200)
 async def post_constants():
     data = {
-        'speedCenter': app.MOTOR_CENTER,
-        'speedOffset': app.MOTOR_OFFSET,
+        'motorCenter': app.MOTOR_CENTER,
+        'motorOffset': app.MOTOR_OFFSET,
         'servoCenter': app.SERVO_CENTER,
         'servoOffset': app.SERVO_OFFSET
     }
@@ -112,3 +113,13 @@ async def deactivate_lkas():
     return {"message": f"LKAS deactivated"}
 
 #endregion
+
+if __name__ == '__main__':
+    uvicorn.run(app, host='0.0.0.0', port=8000)
+
+
+
+
+
+
+
