@@ -31,6 +31,8 @@ app.SERVO_CENTER = -1
 app.SERVO_OFFSET = -1
 app.servo_angle = -1
 
+app.LKAS = False
+
 
 @app.get("/")
 async def root():
@@ -83,8 +85,8 @@ async def get_servo_angle():
 
 #region Constants
 
-@app.post("/drive/constants")
-async def get_constants():
+@app.post("/drive/constants", status_code=200)
+async def post_constants():
     data = {
         'speedCenter': app.MOTOR_CENTER,
         'speedOffset': app.MOTOR_OFFSET,
@@ -93,5 +95,20 @@ async def get_constants():
     }
     return data
 
+
+#endregion
+
+#region LKAS
+
+@app.post("/drive/lkas/activate", status_code=200)
+async def activate_lkas():
+    app.LKAS = True
+    return {"message": f"LKAS activated"}
+
+
+@app.post("/drive/lkas/deactivate", status_code=200)
+async def deactivate_lkas():
+    app.LKAS = False
+    return {"message": f"LKAS deactivated"}
 
 #endregion
