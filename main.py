@@ -6,16 +6,19 @@ import os
 import time
 import pigpio
 
+DEBUG_MODE = True
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print("Starting up")
 
-    # setup pigpio
-    os.system("sudo pigpiod")
-    time.sleep(3)
-    app.pi = pigpio.pi()
-    time.sleep(3)
+    if not DEBUG_MODE:
+        #setup pigpio
+        os.system("sudo pigpiod")
+        time.sleep(3)
+        app.pi = pigpio.pi()
+        time.sleep(3)
 
     print("Pigpio started")
 
@@ -64,8 +67,9 @@ async def set_motor_speed(speed: int):
         app.motor_speed = app.MOTOR_CENTER + app.MOTOR_OFFSET
         raise HTTPException(status_code=400, detail=f"Speed {speed} is out of range set to maximum")
 
+    if not DEBUG_MODE:
+        app.pi.set_servo_pulsewidth(app.SERVO_PIN, speed)
     app.motor_speed = speed
-    app.pi.set_servo_pulsewidth(app.SERVO_PIN, speed)
     return {"message": f"Setting motor speed to {speed}"}
 
 
@@ -87,7 +91,8 @@ async def set_servo_angle(angle: int):
         app.servo_angle = app.SERVO_CENTER + app.SERVO_OFFSET
         raise HTTPException(status_code=400, detail=f"Angle {angle} is out of range set to maximum")
 
-    app.pi.set_servo_pulsewidth(app.SERVO_PIN, angle)
+    if not DEBUG_MODE:
+        app.pi.set_servo_pulsewidth(app.SERVO_PIN, angle)
     app.servo_angle = angle
     return {"message": f"Setting servo angle to {angle}"}
 
