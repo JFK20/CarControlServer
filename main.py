@@ -1,4 +1,3 @@
-import socket
 import uvicorn
 from fastapi import FastAPI, HTTPException
 from contextlib import asynccontextmanager
@@ -6,6 +5,7 @@ import json
 import os
 import time
 import pigpio
+from getIPAdress import IP_ADDRESS
 
 DEBUG_MODE = True
 
@@ -136,13 +136,4 @@ async def deactivate_lkas():
 # endregion
 
 if __name__ == '__main__':
-    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    try:
-        # doesn't need to be reachable, just needs to be a valid IP address
-        s.connect(("8.8.8.8", 80))
-        ip_address = s.getsockname()[0]
-    except Exception:
-        ip_address = '127.0.0.1'
-    finally:
-        s.close()
-    uvicorn.run(app, host=ip_address, port=8000)
+    uvicorn.run(app, host=IP_ADDRESS, port=8000)
