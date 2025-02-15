@@ -5,19 +5,7 @@ services:
       dockerfile: Dockerfile
     ports:
       - "8000:8000"
-    networks:
-      - Car
-
-  test_servo:
-      build:
-        context: .
-        dockerfile: Dockerfile
-      networks:
-        - Car
-      command: >
-        sh -c "python -m unittest motor_tests.py"
-      depends_on:
-        - server
+    entrypoint: ["sh", "/app/entrypoint.sh"]
 
 networks:
   Car:
