@@ -1,0 +1,24 @@
+services:
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    networks:
+      - Car
+
+  test_servo:
+      build:
+        context: .
+        dockerfile: Dockerfile
+      networks:
+        - Car
+      command: >
+        sh -c "python -m unittest motor_tests.py"
+      depends_on:
+        - server
+
+networks:
+  Car:
+    driver: bridge

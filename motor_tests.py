@@ -6,7 +6,7 @@ class TestMotorSpeed(unittest.TestCase):
 
     def setUp(self):
         self.base_url = "http://" + IP_ADDRESS + ":8000"
-        response = requests.post(self.base_url + "/drive/constants")
+        response = requests.get(self.base_url + "/drive/constants")
         response = response.json()
         #print(response)
         self.motorCenter = response["motorCenter"]

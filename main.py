@@ -107,8 +107,8 @@ async def get_servo_angle():
 
 # region Constants
 
-@app.post("/drive/constants", status_code=200)
-async def post_constants():
+@app.get("/drive/constants", status_code=200)
+async def get_constants():
     data = {
         'motorCenter': app.MOTOR_CENTER,
         'motorOffset': app.MOTOR_OFFSET,
