@@ -1,3 +1,4 @@
+import socket
 import uvicorn
 from fastapi import FastAPI, HTTPException
 from contextlib import asynccontextmanager
@@ -132,8 +133,16 @@ async def deactivate_lkas():
     app.LKAS = False
     return {"message": f"LKAS deactivated"}
 
-
 # endregion
 
 if __name__ == '__main__':
-    uvicorn.run(app, host='0.0.0.0', port=8000)
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        # doesn't need to be reachable, just needs to be a valid IP address
+        s.connect(("8.8.8.8", 80))
+        ip_address = s.getsockname()[0]
+    except Exception:
+        ip_address = '127.0.0.1'
+    finally:
+        s.close()
+    uvicorn.run(app, host=ip_address, port=8000)
