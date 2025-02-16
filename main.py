@@ -7,7 +7,7 @@ import time
 import pigpio
 from getIPAdress import IP_ADDRESS
 
-DEBUG_MODE = True
+DEBUG_MODE = False
 
 
 @asynccontextmanager

@@ -6,7 +6,3 @@ services:
     ports:
       - "8000:8000"
     entrypoint: ["sh", "/app/entrypoint.sh"]
-
-networks:
-  Car:
-    driver: bridge
