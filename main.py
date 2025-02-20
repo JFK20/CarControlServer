@@ -6,8 +6,11 @@ import os
 import time
 import pigpio
 from getIPAdress import IP_ADDRESS
+from webview import get_constants_view
+from fastapi.responses import HTMLResponse
 
-DEBUG_MODE = False
+DEBUG_MODE = True
+WEBVIEW_MODE = True
 
 
 @asynccontextmanager
@@ -16,7 +19,7 @@ async def lifespan(app: FastAPI):
 
     if not DEBUG_MODE:
         #setup pigpio
-        os.system("sudo pigpiod")
+        os.system("sudo systemctl start pigpiod")
         time.sleep(3)
         app.pi = pigpio.pi()
         time.sleep(3)
@@ -132,6 +135,21 @@ async def activate_lkas():
 async def deactivate_lkas():
     app.LKAS = False
     return {"message": f"LKAS deactivated"}
+
+# endregion
+
+# region Webview
+
+if WEBVIEW_MODE:
+    @app.get("/webview/constants", response_class=HTMLResponse)
+    async def view_constants():
+        data = {
+            'motorCenter': app.MOTOR_CENTER,
+            'motorOffset': app.MOTOR_OFFSET,
+            'servoCenter': app.SERVO_CENTER,
+            'servoOffset': app.SERVO_OFFSET
+        }
+        return get_constants_view(data)
 
 # endregion
 
