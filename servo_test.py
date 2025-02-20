@@ -6,11 +6,9 @@ from getIPAdress import IP_ADDRESS
 class TestServoAngle(unittest.TestCase):
 
     def setUp(self):
-        print(IP_ADDRESS)
         self.base_url = "http://" + IP_ADDRESS + ":8000"
         response = requests.get(self.base_url + "/drive/constants")
         response = response.json()
-        #print(response)
         self.servoCenter = response["servoCenter"]
         self.servoOffset = response["servoOffset"]
 

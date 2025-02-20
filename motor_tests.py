@@ -9,7 +9,6 @@ class TestMotorSpeed(unittest.TestCase):
         #self.base_url = "http://localhost:8000"
         response = requests.get(self.base_url + "/drive/constants")
         response = response.json()
-        #print(response)
         self.motorCenter = response["motorCenter"]
         self.motorOffset = response["motorOffset"]
 
