@@ -9,7 +9,7 @@ from getIPAdress import IP_ADDRESS
 from webview import get_constants_view
 from fastapi.responses import HTMLResponse
 
-DEBUG_MODE = True
+DEBUG_MODE = False
 WEBVIEW_MODE = True
 
 
@@ -72,7 +72,7 @@ async def set_motor_speed(speed: int):
         raise HTTPException(status_code=400, detail=f"Speed {speed} is out of range set to maximum")
 
     if not DEBUG_MODE:
-        app.pi.set_servo_pulsewidth(app.SERVO_PIN, speed)
+        app.pi.set_servo_pulsewidth(app.MOTOR_PIN, speed)
     app.motor_speed = speed
     return {"message": f"Setting motor speed to {speed}"}
 
@@ -154,4 +154,4 @@ if WEBVIEW_MODE:
 # endregion
 
 if __name__ == '__main__':
-    uvicorn.run(app, host=IP_ADDRESS, port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8000)
