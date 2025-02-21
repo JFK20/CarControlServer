@@ -5,6 +5,8 @@ import json
 import os
 import time
 import pigpio
+from starlette.responses import JSONResponse
+
 from getIPAdress import IP_ADDRESS
 from webview import get_constants_view
 from fastapi.responses import HTMLResponse
@@ -74,12 +76,13 @@ async def set_motor_speed(speed: int):
     if not DEBUG_MODE:
         app.pi.set_servo_pulsewidth(app.MOTOR_PIN, speed)
     app.motor_speed = speed
-    return app.motor_speed
+    return JSONResponse(content=app.motor_speed)
 
 
 @app.get("/drive/motor/speed", status_code=200)
 async def get_motor_speed():
-    return app.motor_speed
+    return JSONResponse(content=app.motor_speed)
+
 
 
 # endregion
@@ -98,12 +101,12 @@ async def set_servo_angle(angle: int):
     if not DEBUG_MODE:
         app.pi.set_servo_pulsewidth(app.SERVO_PIN, angle)
     app.servo_angle = angle
-    return app.servo_angle
+    return JSONResponse(content=app.servo_angle)
 
 
 @app.get("/drive/servo/angle", status_code=200)
 async def get_servo_angle():
-    return app.servo_angle
+    return JSONResponse(content=app.servo_angle)
 
 
 # endregion
@@ -118,7 +121,7 @@ async def get_constants():
         'servoCenter': app.SERVO_CENTER,
         'servoOffset': app.SERVO_OFFSET
     }
-    return data
+    return JSONResponse(content=data)
 
 
 # endregion
