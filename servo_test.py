@@ -2,7 +2,6 @@ import requests
 import unittest
 from getIPAdress import IP_ADDRESS
 
-
 class TestServoAngle(unittest.TestCase):
 
     def setUp(self):
@@ -18,7 +17,7 @@ class TestServoAngle(unittest.TestCase):
         response = requests.post(f"{self.base_url}/drive/servo/{angle}")
         value = requests.get(f"{self.base_url}/drive/servo/angle")
         self.assertEqual(response.status_code, 400, f"Expected status code 400, but got {response.status_code}")
-        self.assertEqual(value.json()["angle"], self.servoCenter - self.servoOffset, f"Expected angle 800, but got {value.json()['angle']}")
+        self.assertEqual(value.json(), self.servoCenter - self.servoOffset, f"Expected angle 800, but got {value.json()}")
 
     def test_in_range_1000(self):
         # Test when angle is in range
@@ -26,7 +25,7 @@ class TestServoAngle(unittest.TestCase):
         response = requests.post(f"{self.base_url}/drive/servo/{angle}")
         value = requests.get(f"{self.base_url}/drive/servo/angle")
         self.assertEqual(response.status_code, 200, f"Expected status code 200, but got {response.status_code}")
-        self.assertEqual(value.json()["angle"], 1100, f"Expected angle 1000, but got {value.json()['angle']}")
+        self.assertEqual(value.json(), 1100, f"Expected angle 1000, but got {value.json()}")
 
     def test_in_range_1400(self):
         # Another test when angle is in range
@@ -34,7 +33,7 @@ class TestServoAngle(unittest.TestCase):
         response = requests.post(f"{self.base_url}/drive/servo/{angle}")
         value = requests.get(f"{self.base_url}/drive/servo/angle")
         self.assertEqual(response.status_code, 200, f"Expected status code 200, but got {response.status_code}")
-        self.assertEqual(value.json()["angle"], 2000, f"Expected angle 1400, but got {value.json()['angle']}")
+        self.assertEqual(value.json(), 2000, f"Expected angle 1400, but got {value.json()}")
 
     def test_upper_boundary(self):
         # Test when angle is out of range
@@ -42,7 +41,7 @@ class TestServoAngle(unittest.TestCase):
         response = requests.post(f"{self.base_url}/drive/servo/{angle}")
         value = requests.get(f"{self.base_url}/drive/servo/angle")
         self.assertEqual(response.status_code, 400, f"Expected status code 400, but got {response.status_code}")
-        self.assertEqual(value.json()["angle"], self.servoCenter + self.servoOffset, f"Expected angle 1600, but got {value.json()['angle']}")
+        self.assertEqual(value.json(), self.servoCenter + self.servoOffset, f"Expected angle 1600, but got {value.json()}")
 
 
 if __name__ == '__main__':
