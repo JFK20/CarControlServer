@@ -13,6 +13,6 @@ A FastAPI-based server to control an RC car with a Raspberry Pi, featuring manua
 
 ## Prerequisites
 
-- Python 3.11+
+- Python 3.13+
 - Raspberry Pi (when not in debug mode)
 - pigpio daemon (when not in debug mode)

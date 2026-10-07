@@ -1,15 +1,14 @@
-import uvicorn
-from fastapi import FastAPI, HTTPException
-from contextlib import asynccontextmanager
 import json
 import os
 import time
-import pigpio
-from starlette.responses import JSONResponse
+from contextlib import asynccontextmanager
 
-from getIPAdress import IP_ADDRESS
+import pigpio
+import uvicorn
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import HTMLResponse, JSONResponse
+
 from webview import get_constants_view
-from fastapi.responses import HTMLResponse
 
 DEBUG_MODE = True
 WEBVIEW_MODE = True
@@ -18,43 +17,57 @@ WEBVIEW_MODE = True
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print("Starting up")
+    state = app.state
 
     if not DEBUG_MODE:
         #setup pigpio
         os.system("sudo systemctl start pigpiod")
         time.sleep(3)
-        app.pi = pigpio.pi()
+        state.pi = pigpio.pi()
         time.sleep(3)
 
     print("Pigpio started")
 
     with open('constants.json') as json_data:
         constants = json.load(json_data)
-        app.MOTOR_PIN = constants["MOTOR_PIN"]
-        app.MOTOR_CENTER = constants["MOTOR_CENTER"]
-        app.MOTOR_OFFSET = constants["MOTOR_OFFSET"]
-        app.motor_speed = app.MOTOR_CENTER
+        state.MOTOR_PIN = constants["MOTOR_PIN"]
+        state.MOTOR_CENTER = constants["MOTOR_CENTER"]
+        state.MOTOR_OFFSET = constants["MOTOR_OFFSET"]
+        state.motor_speed = state.MOTOR_CENTER
 
-        app.SERVO_PIN = constants["SERVO_PIN"]
-        app.SERVO_CENTER = constants["SERVO_CENTER"]
-        app.SERVO_OFFSET = constants["SERVO_OFFSET"]
-        app.servo_angle = app.SERVO_CENTER
+        state.SERVO_PIN = constants["SERVO_PIN"]
+        state.SERVO_CENTER = constants["SERVO_CENTER"]
+        state.SERVO_OFFSET = constants["SERVO_OFFSET"]
+        state.servo_angle = state.SERVO_CENTER
     yield
+
+    if state.pi is not None:
+        state.pi.stop()
 
 
 app = FastAPI(lifespan=lifespan)
-app.MOTOR_PIN = -1
-app.MOTOR_CENTER = -1
-app.MOTOR_OFFSET = -1
-app.motor_speed = -1
+app.state.MOTOR_PIN = -1
+app.state.MOTOR_CENTER = -1
+app.state.MOTOR_OFFSET = -1
+app.state.motor_speed = -1
 
-app.SERVO_PIN = -1
-app.SERVO_CENTER = -1
-app.SERVO_OFFSET = -1
-app.servo_angle = -1
-app.pi = None
+app.state.SERVO_PIN = -1
+app.state.SERVO_CENTER = -1
+app.state.SERVO_OFFSET = -1
+app.state.servo_angle = -1
+app.state.pi = None
 
-app.LKAS = False
+app.state.LKAS = False
+
+
+def get_constants_data() -> dict:
+    state = app.state
+    return {
+        'motorCenter': state.MOTOR_CENTER,
+        'motorOffset': state.MOTOR_OFFSET,
+        'servoCenter': state.SERVO_CENTER,
+        'servoOffset': state.SERVO_OFFSET
+    }
 
 
 @app.get("/")
@@ -66,23 +79,23 @@ async def root():
 
 @app.post("/drive/motor/{speed}", status_code=200)
 async def set_motor_speed(speed: int):
-    if speed < app.MOTOR_CENTER - app.MOTOR_OFFSET:
-        app.motor_speed = app.MOTOR_CENTER - app.MOTOR_OFFSET
+    state = app.state
+    if speed < state.MOTOR_CENTER - state.MOTOR_OFFSET:
+        state.motor_speed = state.MOTOR_CENTER - state.MOTOR_OFFSET
         raise HTTPException(status_code=400, detail=f"Speed {speed} is out of range set to minimum")
-    elif speed > app.MOTOR_CENTER + app.MOTOR_OFFSET:
-        app.motor_speed = app.MOTOR_CENTER + app.MOTOR_OFFSET
+    elif speed > state.MOTOR_CENTER + state.MOTOR_OFFSET:
+        state.motor_speed = state.MOTOR_CENTER + state.MOTOR_OFFSET
         raise HTTPException(status_code=400, detail=f"Speed {speed} is out of range set to maximum")
 
     if not DEBUG_MODE:
-        app.pi.set_servo_pulsewidth(app.MOTOR_PIN, speed)
-    app.motor_speed = speed
-    return {"motor": app.motor_speed}
+        state.pi.set_servo_pulsewidth(state.MOTOR_PIN, speed)
+    state.motor_speed = speed
+    return {"motor": state.motor_speed}
+
 
 @app.get("/drive/motor/speed", status_code=200)
 async def get_motor_speed():
-    return {"motor": app.motor_speed}
-
-
+    return {"motor": app.state.motor_speed}
 
 # endregion
 
@@ -90,22 +103,23 @@ async def get_motor_speed():
 
 @app.post("/drive/servo/{angle}", status_code=200)
 async def set_servo_angle(angle: int):
-    if angle < app.SERVO_CENTER - app.SERVO_OFFSET:
-        app.servo_angle = app.SERVO_CENTER - app.SERVO_OFFSET
+    state = app.state
+    if angle < state.SERVO_CENTER - state.SERVO_OFFSET:
+        state.servo_angle = state.SERVO_CENTER - state.SERVO_OFFSET
         raise HTTPException(status_code=400, detail=f"Angle {angle} is out of range set to minimum")
-    elif angle > app.SERVO_CENTER + app.SERVO_OFFSET:
-        app.servo_angle = app.SERVO_CENTER + app.SERVO_OFFSET
+    elif angle > state.SERVO_CENTER + state.SERVO_OFFSET:
+        state.servo_angle = state.SERVO_CENTER + state.SERVO_OFFSET
         raise HTTPException(status_code=400, detail=f"Angle {angle} is out of range set to maximum")
 
     if not DEBUG_MODE:
-        app.pi.set_servo_pulsewidth(app.SERVO_PIN, angle)
-    app.servo_angle = angle
-    return {"servo": app.servo_angle}
+        state.pi.set_servo_pulsewidth(state.SERVO_PIN, angle)
+    state.servo_angle = angle
+    return {"servo": state.servo_angle}
 
 
 @app.get("/drive/servo/angle", status_code=200)
 async def get_servo_angle():
-    return {"servo": app.servo_angle}
+    return {"servo": app.state.servo_angle}
 
 # endregion
 
@@ -113,14 +127,7 @@ async def get_servo_angle():
 
 @app.get("/drive/constants", status_code=200)
 async def get_constants():
-    data = {
-        'motorCenter': app.MOTOR_CENTER,
-        'motorOffset': app.MOTOR_OFFSET,
-        'servoCenter': app.SERVO_CENTER,
-        'servoOffset': app.SERVO_OFFSET
-    }
-    return JSONResponse(content=data)
-
+    return JSONResponse(content=get_constants_data())
 
 # endregion
 
@@ -128,13 +135,13 @@ async def get_constants():
 
 @app.post("/drive/lkas/activate", status_code=200)
 async def activate_lkas():
-    app.LKAS = True
+    app.state.LKAS = True
     return True
 
 
 @app.post("/drive/lkas/deactivate", status_code=200)
 async def deactivate_lkas():
-    app.LKAS = False
+    app.state.LKAS = False
     return False
 
 # endregion
@@ -144,13 +151,7 @@ async def deactivate_lkas():
 if WEBVIEW_MODE:
     @app.get("/webview/constants", response_class=HTMLResponse)
     async def view_constants():
-        data = {
-            'motorCenter': app.MOTOR_CENTER,
-            'motorOffset': app.MOTOR_OFFSET,
-            'servoCenter': app.SERVO_CENTER,
-            'servoOffset': app.SERVO_OFFSET
-        }
-        return get_constants_view(data)
+        return get_constants_view(get_constants_data())
 
 # endregion
 
