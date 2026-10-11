@@ -3,7 +3,7 @@ import pigpio
 # echo pulses longer than this are out of range (> ~4 m)
 MAX_PULSE_US = 25000
 
-
+#https://www.elektronik-kompendium.de/sites/praxis/bauteil_ultrasonic-hcsr04p.htm
 class Sonar:
     # HC-SR04 ultrasonic sensor, the echo pulse is timed by pigpiod in microseconds
     def __init__(self, pi: pigpio.pi, trigger_pin: int, echo_pin: int):
@@ -17,12 +17,15 @@ class Sonar:
         pi.set_mode(echo_pin, pigpio.INPUT)
         self._cb = pi.callback(echo_pin, pigpio.EITHER_EDGE, self._edge)
 
+    # it calculates the distance between the pulls going out level=1 and it coming back level=0
     def _edge(self, gpio, level, tick):
         if level == 1:
             self._rise = tick
         elif level == 0 and self._rise is not None:
             pulse = pigpio.tickDiff(self._rise, tick)
             # sound travels there and back: 58 us per cm
+            # is time x 0,0343 / 2 where 0,0343 is the speed of sound
+            # / 58 is just the fraction simplefied
             self.distance = pulse / 58.0 if pulse < MAX_PULSE_US else None
             self._rise = None
 
