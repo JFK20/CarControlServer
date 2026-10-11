@@ -1,3 +1,4 @@
+import asyncio
 import json
 import os
 import time
@@ -8,10 +9,21 @@ import uvicorn
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, JSONResponse
 
+from sonar import Sonar
 from webview import get_constants_view
 
 DEBUG_MODE = True
 WEBVIEW_MODE = True
+
+
+async def sonar_loop(sonar: Sonar):
+    # measures permanently, 100 ms per cycle (datasheet minimum is 60 ms)
+    while True:
+        sonar.trigger()
+        await asyncio.sleep(0.1)
+        distance = sonar.distance
+        if distance is not None and distance < app.state.SONAR_WARN_DISTANCE:
+            print(f"Distance: {distance:.1f} cm")
 
 
 @asynccontextmanager
@@ -39,8 +51,21 @@ async def lifespan(app: FastAPI):
         state.SERVO_CENTER = constants["SERVO_CENTER"]
         state.SERVO_OFFSET = constants["SERVO_OFFSET"]
         state.servo_angle = state.SERVO_CENTER
+
+        state.SONAR_TRIGGER_PIN = constants["SONAR_TRIGGER_PIN"]
+        state.SONAR_ECHO_PIN = constants["SONAR_ECHO_PIN"]
+        state.SONAR_WARN_DISTANCE = constants["SONAR_WARN_DISTANCE"]
+
+    sonar = None
+    sonar_task = None
+    if not DEBUG_MODE:
+        sonar = Sonar(state.pi, state.SONAR_TRIGGER_PIN, state.SONAR_ECHO_PIN)
+        sonar_task = asyncio.create_task(sonar_loop(sonar))
     yield
 
+    if sonar_task is not None:
+        sonar_task.cancel()
+        sonar.cancel()
     if state.pi is not None:
         state.pi.stop()
 
@@ -55,6 +80,10 @@ app.state.SERVO_PIN = -1
 app.state.SERVO_CENTER = -1
 app.state.SERVO_OFFSET = -1
 app.state.servo_angle = -1
+
+app.state.SONAR_TRIGGER_PIN = -1
+app.state.SONAR_ECHO_PIN = -1
+app.state.SONAR_WARN_DISTANCE = -1
 app.state.pi = None
 
 app.state.LKAS = False
