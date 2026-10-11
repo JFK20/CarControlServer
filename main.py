@@ -18,12 +18,30 @@ WEBVIEW_MODE = True
 
 async def sonar_loop(sonar: Sonar):
     # measures permanently, 100 ms per cycle (datasheet minimum is 60 ms)
+    state = app.state
     while True:
         sonar.trigger()
         await asyncio.sleep(0.1)
         distance = sonar.distance
-        if distance is not None and distance < app.state.SONAR_WARN_DISTANCE:
+        state.obstacle = distance is not None and distance < state.SONAR_BRAKE_DISTANCE
+        if state.obstacle:
             print(f"Distance: {distance:.1f} cm")
+            # forward commands are blocked while the obstacle is there, so this only fires once
+            if state.motor_speed > state.MOTOR_CENTER:
+                await emergency_brake()
+
+
+async def emergency_brake():
+    # full brake for BRAKE_TIME, then neutral so the ESC doesn't switch into reverse
+    state = app.state
+    print("Obstacle ahead, braking")
+    state.braking = True
+    try:
+        write_motor(state.MOTOR_CENTER - state.MOTOR_OFFSET)
+        await asyncio.sleep(state.BRAKE_TIME)
+    finally:
+        write_motor(state.MOTOR_CENTER)
+        state.braking = False
 
 
 @asynccontextmanager
@@ -54,7 +72,8 @@ async def lifespan(app: FastAPI):
 
         state.SONAR_TRIGGER_PIN = constants["SONAR_TRIGGER_PIN"]
         state.SONAR_ECHO_PIN = constants["SONAR_ECHO_PIN"]
-        state.SONAR_WARN_DISTANCE = constants["SONAR_WARN_DISTANCE"]
+        state.SONAR_BRAKE_DISTANCE = constants["SONAR_BRAKE_DISTANCE"]
+        state.BRAKE_TIME = constants["BRAKE_TIME"]
 
     sonar = None
     sonar_task = None
@@ -83,7 +102,10 @@ app.state.servo_angle = -1
 
 app.state.SONAR_TRIGGER_PIN = -1
 app.state.SONAR_ECHO_PIN = -1
-app.state.SONAR_WARN_DISTANCE = -1
+app.state.SONAR_BRAKE_DISTANCE = -1
+app.state.BRAKE_TIME = -1
+app.state.obstacle = False
+app.state.braking = False
 app.state.pi = None
 
 app.state.LKAS = False
@@ -119,10 +141,21 @@ def apply_motor(speed: int) -> str | None:
         error = f"Speed {speed} is out of range set to maximum"
         speed = state.MOTOR_CENTER + state.MOTOR_OFFSET
 
+    if state.braking:
+        return "Emergency brake active, motor command ignored"
+    if state.obstacle and speed > state.MOTOR_CENTER:
+        error = "Obstacle ahead, forward blocked"
+        speed = state.MOTOR_CENTER
+
+    write_motor(speed)
+    return error
+
+
+def write_motor(speed: int):
+    state = app.state
     if not DEBUG_MODE:
         state.pi.set_servo_pulsewidth(state.MOTOR_PIN, speed)
     state.motor_speed = speed
-    return error
 
 
 def apply_servo(angle: int) -> str | None:

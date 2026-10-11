@@ -38,3 +38,6 @@ Out-of-range values are clamped, and the reply includes an `"error"` field.
 Invalid messages get `{"type": "error", "error": "..."}`, and the connection stays open.
 
 **Failsafe:** when a WebSocket connection closes, the motor is reset to `MOTOR_CENTER` (neutral).
+**Obstacle brake:** an HC-SR04 (`SONAR_TRIGGER_PIN` / `SONAR_ECHO_PIN`) measures the distance every 100 ms.
+When an obstacle is closer than `SONAR_BRAKE_DISTANCE` cm while driving forward, the motor goes to full brake (`MOTOR_CENTER - MOTOR_OFFSET`) for `BRAKE_TIME` seconds, then to neutral.
+Motor commands are ignored during the brake, and forward commands are blocked as long as the obstacle is there; reverse still works.
