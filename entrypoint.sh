@@ -20,11 +20,20 @@ else
 fi
 
 if [ $SERVO_TESTS_STATUS -eq 0 ]; then
-    echo "All tests passed successfully"
-    # Keep the FastAPI server running in foreground
-    wait %1
+    python -m unittest ws_tests.py
+    WS_TESTS_STATUS=$?
 else
     echo "Servo tests failed with status $SERVO_TESTS_STATUS"
     kill %1  # Kill the background FastAPI process
     exit $SERVO_TESTS_STATUS
+fi
+
+if [ $WS_TESTS_STATUS -eq 0 ]; then
+    echo "All tests passed successfully"
+    # Keep the FastAPI server running in foreground
+    wait %1
+else
+    echo "WebSocket tests failed with status $WS_TESTS_STATUS"
+    kill %1  # Kill the background FastAPI process
+    exit $WS_TESTS_STATUS
 fi

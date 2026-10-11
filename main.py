@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 
 import pigpio
 import uvicorn
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from webview import get_constants_view
@@ -70,6 +70,49 @@ def get_constants_data() -> dict:
     }
 
 
+def get_state() -> dict:
+    state = app.state
+    return {
+        'motor': state.motor_speed,
+        'servo': state.servo_angle,
+        'lkas': state.LKAS
+    }
+
+
+def apply_motor(speed: int) -> str | None:
+    # clamps to the allowed range, writes to the pin and returns an error message if clamped
+    state = app.state
+    error = None
+    if speed < state.MOTOR_CENTER - state.MOTOR_OFFSET:
+        error = f"Speed {speed} is out of range set to minimum"
+        speed = state.MOTOR_CENTER - state.MOTOR_OFFSET
+    elif speed > state.MOTOR_CENTER + state.MOTOR_OFFSET:
+        error = f"Speed {speed} is out of range set to maximum"
+        speed = state.MOTOR_CENTER + state.MOTOR_OFFSET
+
+    if not DEBUG_MODE:
+        state.pi.set_servo_pulsewidth(state.MOTOR_PIN, speed)
+    state.motor_speed = speed
+    return error
+
+
+def apply_servo(angle: int) -> str | None:
+    # clamps to the allowed range, writes to the pin and returns an error message if clamped
+    state = app.state
+    error = None
+    if angle < state.SERVO_CENTER - state.SERVO_OFFSET:
+        error = f"Angle {angle} is out of range set to minimum"
+        angle = state.SERVO_CENTER - state.SERVO_OFFSET
+    elif angle > state.SERVO_CENTER + state.SERVO_OFFSET:
+        error = f"Angle {angle} is out of range set to maximum"
+        angle = state.SERVO_CENTER + state.SERVO_OFFSET
+
+    if not DEBUG_MODE:
+        state.pi.set_servo_pulsewidth(state.SERVO_PIN, angle)
+    state.servo_angle = angle
+    return error
+
+
 @app.get("/")
 async def root():
     return {"message": "Hello World"}
@@ -79,18 +122,10 @@ async def root():
 
 @app.post("/drive/motor/{speed}", status_code=200)
 async def set_motor_speed(speed: int):
-    state = app.state
-    if speed < state.MOTOR_CENTER - state.MOTOR_OFFSET:
-        state.motor_speed = state.MOTOR_CENTER - state.MOTOR_OFFSET
-        raise HTTPException(status_code=400, detail=f"Speed {speed} is out of range set to minimum")
-    elif speed > state.MOTOR_CENTER + state.MOTOR_OFFSET:
-        state.motor_speed = state.MOTOR_CENTER + state.MOTOR_OFFSET
-        raise HTTPException(status_code=400, detail=f"Speed {speed} is out of range set to maximum")
-
-    if not DEBUG_MODE:
-        state.pi.set_servo_pulsewidth(state.MOTOR_PIN, speed)
-    state.motor_speed = speed
-    return {"motor": state.motor_speed}
+    error = apply_motor(speed)
+    if error:
+        raise HTTPException(status_code=400, detail=error)
+    return {"motor": app.state.motor_speed}
 
 
 @app.get("/drive/motor/speed", status_code=200)
@@ -103,18 +138,10 @@ async def get_motor_speed():
 
 @app.post("/drive/servo/{angle}", status_code=200)
 async def set_servo_angle(angle: int):
-    state = app.state
-    if angle < state.SERVO_CENTER - state.SERVO_OFFSET:
-        state.servo_angle = state.SERVO_CENTER - state.SERVO_OFFSET
-        raise HTTPException(status_code=400, detail=f"Angle {angle} is out of range set to minimum")
-    elif angle > state.SERVO_CENTER + state.SERVO_OFFSET:
-        state.servo_angle = state.SERVO_CENTER + state.SERVO_OFFSET
-        raise HTTPException(status_code=400, detail=f"Angle {angle} is out of range set to maximum")
-
-    if not DEBUG_MODE:
-        state.pi.set_servo_pulsewidth(state.SERVO_PIN, angle)
-    state.servo_angle = angle
-    return {"servo": state.servo_angle}
+    error = apply_servo(angle)
+    if error:
+        raise HTTPException(status_code=400, detail=error)
+    return {"servo": app.state.servo_angle}
 
 
 @app.get("/drive/servo/angle", status_code=200)
@@ -143,6 +170,58 @@ async def activate_lkas():
 async def deactivate_lkas():
     app.state.LKAS = False
     return False
+
+# endregion
+
+# region WebSocket
+
+def _is_number(value) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+@app.websocket("/ws/drive")
+async def drive_ws(ws: WebSocket):
+    await ws.accept()
+    await ws.send_json({"type": "state", **get_state(), "constants": get_constants_data()})
+    try:
+        while True:
+            try:
+                msg = json.loads(await ws.receive_text())
+            except json.JSONDecodeError:
+                await ws.send_json({"type": "error", "error": "Invalid JSON"})
+                continue
+            if not isinstance(msg, dict):
+                await ws.send_json({"type": "error", "error": "Message must be a JSON object"})
+                continue
+
+            if "motor" in msg and not _is_number(msg["motor"]):
+                await ws.send_json({"type": "error", "error": "motor must be a number"})
+                continue
+            if "servo" in msg and not _is_number(msg["servo"]):
+                await ws.send_json({"type": "error", "error": "servo must be a number"})
+                continue
+            if "lkas" in msg and not isinstance(msg["lkas"], bool):
+                await ws.send_json({"type": "error", "error": "lkas must be a boolean"})
+                continue
+
+            errors = []
+            if "motor" in msg:
+                errors.append(apply_motor(int(msg["motor"])))
+            if "servo" in msg:
+                errors.append(apply_servo(int(msg["servo"])))
+            if "lkas" in msg:
+                app.state.LKAS = msg["lkas"]
+
+            response = {"type": "state", **get_state()}
+            errors = [e for e in errors if e]
+            if errors:
+                response["error"] = "; ".join(errors)
+            await ws.send_json(response)
+    except WebSocketDisconnect:
+        pass
+    finally:
+        # failsafe: stop the car when the connection drops
+        apply_motor(app.state.MOTOR_CENTER)
 
 # endregion
 

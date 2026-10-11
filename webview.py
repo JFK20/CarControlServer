@@ -40,6 +40,12 @@ def get_constants_view(constants: dict) -> HTMLResponse:
                     margin-top: 5px;
                     font-weight: bold;
                 }}
+                .connected {{
+                    color: green;
+                }}
+                .disconnected {{
+                    color: red;
+                }}
             </style>
         </head>
         <body>
@@ -70,6 +76,7 @@ def get_constants_view(constants: dict) -> HTMLResponse:
             </div>
             <div class="container">
                 <h1>Controls</h1>
+                <div id="wsStatus" class="disconnected">Disconnected</div>
                 <div class="slider-container">
                     <h3>Motor Speed</h3>
                     <input type="range" 
@@ -92,27 +99,65 @@ def get_constants_view(constants: dict) -> HTMLResponse:
                 </div>
             </div>
             <script>
-                async function updateMotorSpeed(value) {{
-                    document.getElementById('motorValue').textContent = 'Current: ' + value;
-                    try {{
-                        const response = await fetch(`/drive/motor/${{value}}`, {{
-                            method: 'POST'
-                        }});
-                    }} catch (error) {{
-                        console.error('Error:', error);
-                    }}
+                const wsUrl = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws/drive';
+                let ws = null;
+                let pending = {{}};
+                let flushScheduled = false;
+
+                function setStatus(connected) {{
+                    const status = document.getElementById('wsStatus');
+                    status.textContent = connected ? 'Connected' : 'Disconnected';
+                    status.className = connected ? 'connected' : 'disconnected';
                 }}
 
-                async function updateServoAngle(value) {{
-                    document.getElementById('servoValue').textContent = 'Current: ' + value;
-                    try {{
-                        const response = await fetch(`/drive/servo/${{value}}`, {{
-                            method: 'POST'
-                        }});
-                    }} catch (error) {{
-                        console.error('Error:', error);
-                    }}
+                function connect() {{
+                    ws = new WebSocket(wsUrl);
+                    ws.onopen = () => {{
+                        setStatus(true);
+                        flush();
+                    }};
+                    ws.onmessage = (event) => {{
+                        const msg = JSON.parse(event.data);
+                        if (msg.error) console.error('Error:', msg.error);
+                        if (msg.type !== 'state') return;
+                        document.getElementById('motorValue').textContent = 'Current: ' + msg.motor;
+                        document.getElementById('servoValue').textContent = 'Current: ' + msg.servo;
+                    }};
+                    ws.onclose = () => {{
+                        setStatus(false);
+                        setTimeout(connect, 1000);
+                    }};
                 }}
+
+                // send at most one combined message per animation frame
+                function scheduleFlush() {{
+                    if (flushScheduled) return;
+                    flushScheduled = true;
+                    requestAnimationFrame(() => {{
+                        flushScheduled = false;
+                        flush();
+                    }});
+                }}
+
+                function flush() {{
+                    if (!ws || ws.readyState !== WebSocket.OPEN || Object.keys(pending).length === 0) return;
+                    ws.send(JSON.stringify(pending));
+                    pending = {{}};
+                }}
+
+                function updateMotorSpeed(value) {{
+                    document.getElementById('motorValue').textContent = 'Current: ' + value;
+                    pending.motor = Number(value);
+                    scheduleFlush();
+                }}
+
+                function updateServoAngle(value) {{
+                    document.getElementById('servoValue').textContent = 'Current: ' + value;
+                    pending.servo = Number(value);
+                    scheduleFlush();
+                }}
+
+                connect();
             </script>
         </body>
     </html>
